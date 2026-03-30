@@ -429,6 +429,205 @@ public class XQDocGeneratorTest {
         assertEquals("m:next", module.functions.get(1).name);
     }
 
+    // ---- Real-world module: xqdoc-display.xqy (XQuery 1.0) ----
+
+    @Test
+    public void xqdocDisplayModule() throws IOException {
+        final XQDocModule module = generator.parse(loadResource("xqdoc-display.xqy"));
+        assertEquals("library", module.namespaceUri != null ? "library" : "main");
+        assertEquals("display", module.namespacePrefix);
+        assertEquals("xqdoc/xqdoc-display", module.namespaceUri);
+        assertEquals(33, module.functions.size());
+        // Module-level xqdoc comment
+        assertNotNull(module.xqdocComment);
+        assertTrue(module.xqdocComment.contains("xqDoc"));
+        // Structured XML output
+        final String xml = new XQDocXmlEmitter().emit(module);
+        // All functions have descriptions
+        assertTrue("Should have 33+ descriptions",
+                xml.split("<description>").length - 1 >= 33);
+        // Has @param and @return tags as separate elements
+        assertTrue("Should have <param> elements", xml.contains("<param>"));
+        assertTrue("Should have <return> elements", xml.contains("<return>"));
+        assertTrue("Should have <author> element", xml.contains("<author>"));
+    }
+
+    // ---- XQuery 3.1 features ----
+
+    @Test
+    public void xq31Module() throws IOException {
+        final XQDocModule module = generator.parse(loadResource("xq31-test.xqm"));
+        assertEquals("xq31", module.namespacePrefix);
+        assertEquals(8, module.functions.size());
+        assertEquals(2, module.variables.size());
+
+        // Map type parameters
+        final Function mergeConfig = module.functions.stream()
+                .filter(f -> f.name.equals("xq31:merge-config")).findFirst().orElse(null);
+        assertNotNull("merge-config function", mergeConfig);
+        assertEquals(2, mergeConfig.params.size());
+        assertTrue(mergeConfig.params.get(0).type.contains("map"));
+
+        // HOF parameter (function type)
+        final Function mapTransform = module.functions.stream()
+                .filter(f -> f.name.equals("xq31:map-transform")).findFirst().orElse(null);
+        assertNotNull("map-transform function", mapTransform);
+        assertTrue(mapTransform.params.get(1).type.contains("function"));
+
+        // Array type
+        final Function flatten = module.functions.stream()
+                .filter(f -> f.name.equals("xq31:flatten")).findFirst().orElse(null);
+        assertNotNull("flatten function", flatten);
+        assertTrue(flatten.params.get(0).type.contains("array"));
+
+        // Structured tags
+        final ParsedComment mergeComment = XQDocGenerator.parseComment(mergeConfig.xqdocComment);
+        assertNotNull(mergeComment);
+        assertEquals(2, mergeComment.params.size());
+        assertEquals("$base", mergeComment.params.get(0).name);
+        assertNotNull(mergeComment.returnDesc);
+
+        // @error tag
+        final Function safeParse = module.functions.stream()
+                .filter(f -> f.name.equals("xq31:safe-parse-int")).findFirst().orElse(null);
+        assertNotNull(safeParse);
+        final ParsedComment safeParseComment = XQDocGenerator.parseComment(safeParse.xqdocComment);
+        assertFalse("Should have @error", safeParseComment.errors.isEmpty());
+    }
+
+    // ---- XQuery 4.0 features ----
+
+    @Test
+    public void xq40Module() throws IOException {
+        final XQDocModule module = generator.parse(loadResource("xq40-test.xqm"));
+        assertEquals("4.0", module.version);
+        assertEquals("xq4", module.namespacePrefix);
+        assertEquals(9, module.functions.size());
+        assertEquals(1, module.variables.size());
+
+        // Default parameter values
+        final Function greet = module.functions.stream()
+                .filter(f -> f.name.equals("xq4:greet")).findFirst().orElse(null);
+        assertNotNull("greet function", greet);
+        assertEquals(3, greet.params.size());
+
+        // Default parameter values
+        final Function paginate = module.functions.stream()
+                .filter(f -> f.name.equals("xq4:paginate")).findFirst().orElse(null);
+        assertNotNull("paginate function", paginate);
+        assertEquals(3, paginate.params.size());
+
+        // @deprecated tag
+        final Function doubleFunc = module.functions.stream()
+                .filter(f -> f.name.equals("xq4:double")).findFirst().orElse(null);
+        assertNotNull(doubleFunc);
+        final ParsedComment doubleComment = XQDocGenerator.parseComment(doubleFunc.xqdocComment);
+        assertNotNull("Should have @deprecated", doubleComment.deprecated);
+        assertTrue(doubleComment.deprecated.contains("multiply"));
+
+        // Markdown output
+        final String md = new XQDocMarkdownEmitter().emit(module);
+        assertTrue(md.contains("xq4:pipeline-transform"));
+        assertTrue(md.contains("xq4:greet"));
+        assertTrue(md.contains("> **Deprecated:**"));
+    }
+
+    // ---- XQUF features ----
+
+    @Test
+    public void xqufModule() throws IOException {
+        final XQDocModule module = generator.parse(loadResource("xquf-test.xqm"));
+        assertEquals("xquf", module.namespacePrefix);
+        assertEquals(6, module.functions.size());
+        assertEquals(1, module.variables.size());
+
+        // Updating function
+        final Function addItem = module.functions.stream()
+                .filter(f -> f.name.equals("xquf:add-item")).findFirst().orElse(null);
+        assertNotNull("add-item updating function", addItem);
+        assertTrue("Should be updating", addItem.isUpdating);
+        assertEquals(4, addItem.params.size());
+
+        // Non-updating function with copy-modify-return
+        final Function removeItem = module.functions.stream()
+                .filter(f -> f.name.equals("xquf:remove-item")).findFirst().orElse(null);
+        assertNotNull(removeItem);
+        assertFalse("Should not be updating", removeItem.isUpdating);
+        assertEquals("document-node()", removeItem.returnType);
+
+        // HOF parameter in updating function
+        final Function deactivate = module.functions.stream()
+                .filter(f -> f.name.equals("xquf:deactivate-matching")).findFirst().orElse(null);
+        assertNotNull(deactivate);
+        assertTrue(deactivate.isUpdating);
+        assertTrue(deactivate.params.get(1).type.contains("function"));
+
+        // @deprecated tag
+        final Function applyUpdates = module.functions.stream()
+                .filter(f -> f.name.equals("xquf:apply-updates")).findFirst().orElse(null);
+        assertNotNull(applyUpdates);
+        final ParsedComment applyComment = XQDocGenerator.parseComment(applyUpdates.xqdocComment);
+        assertNotNull("Should have @deprecated", applyComment.deprecated);
+
+        // @see tag
+        final ParsedComment deactivateComment = XQDocGenerator.parseComment(deactivate.xqdocComment);
+        assertFalse("Should have @see", deactivateComment.see.isEmpty());
+        assertTrue(deactivateComment.see.get(0).contains("xquf:add-item"));
+
+        // XML output structured tags
+        final String xml = new XQDocXmlEmitter().emit(module);
+        assertTrue(xml.contains("<deprecated>"));
+        assertTrue(xml.contains("<see>"));
+        assertTrue(xml.contains("<error>"));
+    }
+
+    // ---- ParsedComment unit tests ----
+
+    @Test
+    public void parseCommentAllTags() {
+        final ParsedComment parsed = XQDocGenerator.parseComment(
+                "A function description.\n" +
+                " : @param $x The x value\n" +
+                " : @param $y The y value\n" +
+                " : @return The computed result\n" +
+                " : @author Alice\n" +
+                " : @version 2.0\n" +
+                " : @since 1.5\n" +
+                " : @see https://example.com\n" +
+                " : @see other-function#2\n" +
+                " : @deprecated Use new-function instead\n" +
+                " : @error err:CUSTOM If validation fails\n");
+        assertEquals("A function description.", parsed.description);
+        assertEquals(2, parsed.params.size());
+        assertEquals("$x", parsed.params.get(0).name);
+        assertEquals("The x value", parsed.params.get(0).description);
+        assertEquals("$y", parsed.params.get(1).name);
+        assertEquals("The computed result", parsed.returnDesc);
+        assertEquals("Alice", parsed.author);
+        assertEquals("2.0", parsed.version);
+        assertEquals("1.5", parsed.since);
+        assertEquals(2, parsed.see.size());
+        assertEquals("https://example.com", parsed.see.get(0));
+        assertEquals("other-function#2", parsed.see.get(1));
+        assertEquals("Use new-function instead", parsed.deprecated);
+        assertEquals(1, parsed.errors.size());
+        assertEquals("err:CUSTOM If validation fails", parsed.errors.get(0));
+    }
+
+    @Test
+    public void parseCommentNullReturnsNull() {
+        assertNull(XQDocGenerator.parseComment(null));
+    }
+
+    @Test
+    public void parseCommentDescriptionOnly() {
+        final ParsedComment parsed = XQDocGenerator.parseComment("Just a description.");
+        assertEquals("Just a description.", parsed.description);
+        assertTrue(parsed.params.isEmpty());
+        assertNull(parsed.returnDesc);
+        assertNull(parsed.author);
+    }
+
     // ---- Helpers ----
 
     private String loadResource(final String name) throws IOException {
