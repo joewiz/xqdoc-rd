@@ -25,7 +25,7 @@ public class XQDocMarkdownEmitter {
             sb.append("**XQuery Version:** ").append(module.version).append("\n\n");
         }
         if (module.xqdocComment != null) {
-            sb.append(formatXQDocComment(module.xqdocComment)).append("\n\n");
+            emitParsedComment(sb, XQDocGenerator.parseComment(module.xqdocComment));
         }
 
         // Imports
@@ -49,7 +49,7 @@ public class XQDocMarkdownEmitter {
                 if (var.isExternal) sb.append(" (external)");
                 sb.append("\n\n");
                 if (var.xqdocComment != null) {
-                    sb.append(formatXQDocComment(var.xqdocComment)).append("\n\n");
+                    emitParsedComment(sb, XQDocGenerator.parseComment(var.xqdocComment));
                 }
             }
         }
@@ -94,7 +94,7 @@ public class XQDocMarkdownEmitter {
 
                 // XQDoc comment
                 if (func.xqdocComment != null) {
-                    sb.append(formatXQDocComment(func.xqdocComment)).append("\n\n");
+                    emitParsedComment(sb, XQDocGenerator.parseComment(func.xqdocComment));
                 }
 
                 sb.append("---\n\n");
@@ -105,55 +105,49 @@ public class XQDocMarkdownEmitter {
     }
 
     /**
-     * Format an xqdoc comment, handling @param, @return, @author, etc.
+     * Emit a parsed xqdoc comment as Markdown.
      */
-    private String formatXQDocComment(final String comment) {
-        final StringBuilder sb = new StringBuilder();
-        final String[] lines = comment.split("\n");
-        boolean inParams = false;
+    private void emitParsedComment(final StringBuilder sb, final XQDocGenerator.ParsedComment parsed) {
+        if (parsed == null) return;
 
-        for (String line : lines) {
-            line = line.trim();
-            // Strip leading * or : from xqdoc comment lines
-            if (line.startsWith("*")) line = line.substring(1).trim();
-            if (line.startsWith(":")) line = line.substring(1).trim();
-
-            if (line.startsWith("@param")) {
-                if (!inParams) {
-                    sb.append("\n**Parameters:**\n\n");
-                    inParams = true;
-                }
-                final String rest = line.substring(6).trim();
-                final int space = rest.indexOf(' ');
-                if (space > 0) {
-                    sb.append("- `").append(rest.substring(0, space)).append("` — ")
-                            .append(rest.substring(space + 1).trim()).append("\n");
-                } else {
-                    sb.append("- `").append(rest).append("`\n");
-                }
-            } else if (line.startsWith("@return")) {
-                inParams = false;
-                sb.append("\n**Returns:** ").append(line.substring(7).trim()).append("\n");
-            } else if (line.startsWith("@author")) {
-                inParams = false;
-                sb.append("\n**Author:** ").append(line.substring(7).trim()).append("\n");
-            } else if (line.startsWith("@version")) {
-                inParams = false;
-                sb.append("\n**Version:** ").append(line.substring(8).trim()).append("\n");
-            } else if (line.startsWith("@since")) {
-                inParams = false;
-                sb.append("\n**Since:** ").append(line.substring(6).trim()).append("\n");
-            } else if (line.startsWith("@see")) {
-                inParams = false;
-                sb.append("\n**See:** ").append(line.substring(4).trim()).append("\n");
-            } else if (line.startsWith("@deprecated")) {
-                inParams = false;
-                sb.append("\n> **Deprecated:** ").append(line.substring(11).trim()).append("\n");
-            } else if (!line.isEmpty()) {
-                inParams = false;
-                sb.append(line).append("\n");
-            }
+        if (!parsed.description.isEmpty()) {
+            sb.append(parsed.description).append("\n\n");
         }
-        return sb.toString().trim();
+
+        if (parsed.author != null) {
+            sb.append("**Author:** ").append(parsed.author).append("\n\n");
+        }
+        if (parsed.version != null) {
+            sb.append("**Version:** ").append(parsed.version).append("\n\n");
+        }
+        if (parsed.since != null) {
+            sb.append("**Since:** ").append(parsed.since).append("\n\n");
+        }
+        for (final String see : parsed.see) {
+            sb.append("**See:** ").append(see).append("\n\n");
+        }
+        if (parsed.deprecated != null) {
+            sb.append("> **Deprecated:** ").append(parsed.deprecated).append("\n\n");
+        }
+
+        if (!parsed.params.isEmpty()) {
+            sb.append("**Parameters:**\n\n");
+            for (final XQDocGenerator.ParamTag param : parsed.params) {
+                sb.append("- `").append(param.name).append("`");
+                if (param.description != null && !param.description.isEmpty()) {
+                    sb.append(" — ").append(param.description);
+                }
+                sb.append("\n");
+            }
+            sb.append("\n");
+        }
+
+        if (parsed.returnDesc != null && !parsed.returnDesc.isEmpty()) {
+            sb.append("**Returns:** ").append(parsed.returnDesc).append("\n\n");
+        }
+
+        for (final String error : parsed.errors) {
+            sb.append("**Error:** ").append(error).append("\n\n");
+        }
     }
 }

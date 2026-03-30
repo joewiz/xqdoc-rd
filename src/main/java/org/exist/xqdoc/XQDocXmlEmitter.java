@@ -125,8 +125,42 @@ public class XQDocXmlEmitter {
     }
 
     private void emitComment(final StringBuilder sb, final String comment, final String indent) {
+        final XQDocGenerator.ParsedComment parsed = XQDocGenerator.parseComment(comment);
+        if (parsed == null) return;
+
         sb.append(indent).append("<comment>\n");
-        sb.append(indent).append("  <description>").append(esc(comment.trim())).append("</description>\n");
+        sb.append(indent).append("  <description>").append(esc(parsed.description)).append("</description>\n");
+
+        for (final XQDocGenerator.ParamTag param : parsed.params) {
+            sb.append(indent).append("  <param>").append(esc(param.name));
+            if (param.description != null && !param.description.isEmpty()) {
+                sb.append(" - ").append(esc(param.description));
+            }
+            sb.append("</param>\n");
+        }
+
+        if (parsed.returnDesc != null && !parsed.returnDesc.isEmpty()) {
+            sb.append(indent).append("  <return>").append(esc(parsed.returnDesc)).append("</return>\n");
+        }
+        if (parsed.author != null && !parsed.author.isEmpty()) {
+            sb.append(indent).append("  <author>").append(esc(parsed.author)).append("</author>\n");
+        }
+        if (parsed.version != null && !parsed.version.isEmpty()) {
+            sb.append(indent).append("  <version>").append(esc(parsed.version)).append("</version>\n");
+        }
+        if (parsed.since != null && !parsed.since.isEmpty()) {
+            sb.append(indent).append("  <since>").append(esc(parsed.since)).append("</since>\n");
+        }
+        for (final String see : parsed.see) {
+            sb.append(indent).append("  <see>").append(esc(see)).append("</see>\n");
+        }
+        if (parsed.deprecated != null) {
+            sb.append(indent).append("  <deprecated>").append(esc(parsed.deprecated)).append("</deprecated>\n");
+        }
+        for (final String error : parsed.errors) {
+            sb.append(indent).append("  <error>").append(esc(error)).append("</error>\n");
+        }
+
         sb.append(indent).append("</comment>\n");
     }
 

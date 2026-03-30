@@ -82,6 +82,82 @@ public class XQDocGenerator {
     }
 
     /**
+     * Parsed xqdoc comment with structured tags.
+     */
+    public static class ParsedComment {
+        public String description = "";
+        public final List<ParamTag> params = new ArrayList<>();
+        public String returnDesc;
+        public String author;
+        public String version;
+        public String since;
+        public final List<String> see = new ArrayList<>();
+        public String deprecated;
+        public final List<String> errors = new ArrayList<>();
+    }
+
+    /** A parsed @param tag. */
+    public static class ParamTag {
+        public String name;
+        public String description;
+
+        public ParamTag(final String name, final String description) {
+            this.name = name;
+            this.description = description;
+        }
+    }
+
+    /**
+     * Parse an xqdoc comment string into structured tags.
+     *
+     * @param comment the raw xqdoc comment text (without delimiters)
+     * @return parsed comment, or null if comment is null
+     */
+    public static ParsedComment parseComment(final String comment) {
+        if (comment == null) return null;
+
+        final ParsedComment result = new ParsedComment();
+        final StringBuilder description = new StringBuilder();
+        final String[] lines = comment.split("\n");
+
+        for (String line : lines) {
+            line = line.trim();
+            if (line.startsWith("*")) line = line.substring(1).trim();
+            if (line.startsWith(":")) line = line.substring(1).trim();
+
+            if (line.startsWith("@param ")) {
+                final String rest = line.substring(7).trim();
+                final int space = rest.indexOf(' ');
+                if (space > 0) {
+                    result.params.add(new ParamTag(
+                            rest.substring(0, space), rest.substring(space + 1).trim()));
+                } else {
+                    result.params.add(new ParamTag(rest, ""));
+                }
+            } else if (line.startsWith("@return ")) {
+                result.returnDesc = line.substring(8).trim();
+            } else if (line.startsWith("@author ")) {
+                result.author = line.substring(8).trim();
+            } else if (line.startsWith("@version ")) {
+                result.version = line.substring(9).trim();
+            } else if (line.startsWith("@since ")) {
+                result.since = line.substring(7).trim();
+            } else if (line.startsWith("@see ")) {
+                result.see.add(line.substring(5).trim());
+            } else if (line.startsWith("@deprecated ") || line.equals("@deprecated")) {
+                result.deprecated = line.length() > 11 ? line.substring(12).trim() : "";
+            } else if (line.startsWith("@error ")) {
+                result.errors.add(line.substring(7).trim());
+            } else if (!line.isEmpty()) {
+                if (!description.isEmpty()) description.append("\n");
+                description.append(line);
+            }
+        }
+        result.description = description.toString().trim();
+        return result;
+    }
+
+    /**
      * Parse XQuery source and extract documentation.
      *
      * @param source the XQuery source code
