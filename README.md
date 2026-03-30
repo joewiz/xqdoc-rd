@@ -4,8 +4,8 @@ A standalone XQDoc generator using eXist-db's hand-written XQuery lexer. Parses 
 
 ## Features
 
-- **Zero dependencies** -- standalone 39 KB JAR, no Saxon, no ANTLR, no eXist runtime
-- **Fast** -- 76ms per module (including JVM startup) on a 37-function library
+- **Zero dependencies** -- standalone 38 KB JAR, no Saxon, no ANTLR, no eXist runtime
+- **Fast** -- 71ms average (including JVM startup) on an 820-line, 43-function library
 - **XQuery 3.1 + 4.0** -- pipeline operator, focus functions, keyword arguments, string templates, default parameters
 - **XQUF 3.0** -- updating function declarations, copy/modify/return
 - **XQFT 3.0** -- contains text, score clauses
@@ -18,10 +18,10 @@ A standalone XQDoc generator using eXist-db's hand-written XQuery lexer. Parses 
 mvn package
 
 # Generate Markdown documentation
-java -jar target/xqdoc-rd-0.1.0-SNAPSHOT.jar --format md path/to/module.xqm
+java -jar target/xqdoc-rd-0.1.0.jar --format md path/to/module.xqm
 
 # Generate xqdoc XML
-java -jar target/xqdoc-rd-0.1.0-SNAPSHOT.jar --format xml path/to/module.xqm
+java -jar target/xqdoc-rd-0.1.0.jar --format xml path/to/module.xqm
 ```
 
 ## Usage
@@ -176,26 +176,40 @@ XQuery Source
      +---> XQDocMarkdownEmitter --> Markdown
 ```
 
+## Comparison with xqdoc-rex
+
+This tool was developed alongside [xqdoc-rex](https://github.com/joewiz/xqdoc-rex), which uses a REx-generated parser running on Saxon HE. Head-to-head on `semver.xqm` (820 lines, 43 functions):
+
+| Metric | xqdoc-rd | xqdoc-rex |
+|--------|----------|-----------|
+| Parse time (avg 10 runs) | **71ms** | 1,925ms |
+| JAR size | **38 KB** | 8.6 MB |
+| Runtime dependencies | **0** | Saxon HE 12.5 |
+| Functions extracted | 44 | 43 |
+| @param tags | **85** | **85** |
+| @return tags | **77** | 41 |
+| JVM flags required | none | `-Xss16m` |
+
 ## Running Tests
 
 ```bash
-mvn test
+mvn test    # 34 tests
 ```
 
-The test suite covers:
-- Module declarations (library and main modules)
-- Version declarations with encoding
-- XQDoc comment extraction and attachment
-- Regular comments not captured
-- Namespace and import declarations
-- Variable declarations (typed, external)
-- Function declarations (params, return types, no params, no return type)
-- Annotations (single, multiple, with values)
-- Complex types (function types, map types, sequences)
-- XML output well-formedness and escaping
-- Markdown output formatting of xqdoc tags
-- Edge cases (empty module, nested braces, prolog-only)
-- Full test module with all features combined
+Test modules:
+
+| Module | Features tested |
+|--------|----------------|
+| `test-module.xqm` | All xqdoc tags, HOF types, annotations |
+| `xq31-test.xqm` | Maps, arrays, arrow operator, try/catch, typeswitch |
+| `xq40-test.xqm` | Pipeline, focus functions, keyword args, string templates, default params |
+| `xquf-test.xqm` | Updating functions, copy-modify-return |
+| `xqdoc-display.xqy` | Real-world 1,662-line module (33 functions) |
+
+## Requirements
+
+- Java 21+
+- Maven 3.9+ (to build from source)
 
 ## License
 
